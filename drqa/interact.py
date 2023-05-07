@@ -1,12 +1,14 @@
-import time
 import argparse
-import torch
+import time
+
 import msgpack
+import torch
+
 from drqa.model import DocReaderModel
 from drqa.utils import str2bool
 from prepro import annotate, to_id, init
 from train import BatchGen
-
+import os
 """
 This script serves as a template to be modified to suit all possible testing environments, including and not limited 
 to files (json, xml, csv, ...), web service, databases and so on.
@@ -17,13 +19,13 @@ To change this script to batch model, simply modify line 70 from "BatchGen([mode
 parser = argparse.ArgumentParser(
     description='Interact with document reader model.'
 )
-parser.add_argument('--model-file', default='models/best_model.pt',
-                    help='path to model file')
+parser.add_argument('--model-file', help='path to model file')
+parser.add_argument('--meta-file', default=f'{os.path.dirname(__file__)}/meta.msgpack',
+                    help='path to meta.msgpack file')
 parser.add_argument("--cuda", type=str2bool, nargs='?',
                     const=True, default=torch.cuda.is_available(),
                     help='whether to use GPU acceleration.')
 args = parser.parse_args()
-
 
 if args.cuda:
     checkpoint = torch.load(args.model_file)
@@ -32,7 +34,7 @@ else:
 
 state_dict = checkpoint['state_dict']
 opt = checkpoint['config']
-with open('SQuAD/meta.msgpack', 'rb') as f:
+with open(args.meta_file, 'rb') as f:
     meta = msgpack.load(f, encoding='utf8')
 embedding = torch.Tensor(meta['embedding'])
 opt['pretrained_words'] = True

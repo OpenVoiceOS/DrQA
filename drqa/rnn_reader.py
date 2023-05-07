@@ -5,7 +5,9 @@
 # of patent rights can be found in the PATENTS file in the same directory.
 import torch
 import torch.nn as nn
-from . import layers
+
+from drqa import layers
+
 
 # Modification:
 #   - add 'pos' and 'ner' features.

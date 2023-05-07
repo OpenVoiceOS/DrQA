@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+
 # No modification is made to this file.
 # Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
 
@@ -150,6 +151,7 @@ class SeqAttnMatch(nn.Module):
     * o_i = sum(alpha_j * y_j) for i in X
     * alpha_j = softmax(y_j * x_i)
     """
+
     def __init__(self, input_size, identity=False):
         super(SeqAttnMatch, self).__init__()
         if not identity:
@@ -197,6 +199,7 @@ class BilinearSeqAttn(nn.Module):
 
     Optionally don't normalize output weights.
     """
+
     def __init__(self, x_size, y_size, identity=False):
         super(BilinearSeqAttn, self).__init__()
         if not identity:
@@ -226,6 +229,7 @@ class LinearSeqAttn(nn.Module):
     """Self attention over a sequence:
     * o_i = softmax(Wx_i) for x_i in X.
     """
+
     def __init__(self, input_size):
         super(LinearSeqAttn, self).__init__()
         self.linear = nn.Linear(input_size, 1)

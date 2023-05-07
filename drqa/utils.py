@@ -1,8 +1,9 @@
 import argparse
 
 
-class AverageMeter(object):
+class AverageMeter:
     """Keep exponential weighted averages."""
+
     def __init__(self, beta=0.99):
         self.beta = beta
         self.moment = 0
@@ -30,4 +31,3 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
-

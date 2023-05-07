@@ -1,17 +1,19 @@
-import re
-import json
-import spacy
-import msgpack
-import unicodedata
-import numpy as np
 import argparse
 import collections
-import multiprocessing
-from multiprocessing import Pool
-from tqdm import tqdm
-from functools import partial
-from drqa.utils import str2bool
+import json
 import logging
+import multiprocessing
+import re
+import unicodedata
+from functools import partial
+from multiprocessing import Pool
+
+import msgpack
+import numpy as np
+import spacy
+from tqdm import tqdm
+
+from drqa.utils import str2bool
 
 
 def main():
@@ -85,7 +87,8 @@ def main():
         'embedding': embeddings.tolist(),
         'wv_cased': args.wv_cased,
     }
-    with open('SQuAD/meta.msgpack', 'wb') as f:
+    from os.path import dirname
+    with open(f'{dirname(__file__)}/meta.msgpack', 'wb') as f:
         msgpack.dump(meta, f)
     result = {
         'train': train,
@@ -95,16 +98,17 @@ def main():
     #        question_id, context, context_token_span, answer_start, answer_end
     # dev:   id, context_id, context_features, tag_id, ent_id,
     #        question_id, context, context_token_span, answer
-    with open('SQuAD/data.msgpack', 'wb') as f:
+    with open(f'{dirname(__file__)}/data.msgpack', 'wb') as f:
         msgpack.dump(result, f)
     if args.sample_size:
         sample = {
             'train': train[:args.sample_size],
             'dev': dev[:args.sample_size]
         }
-        with open('SQuAD/sample.msgpack', 'wb') as f:
+        with open(f'{dirname(__file__)}/sample.msgpack', 'wb') as f:
             msgpack.dump(sample, f)
     log.info('saved to disk.')
+
 
 def setup():
     parser = argparse.ArgumentParser(
@@ -140,6 +144,7 @@ def setup():
 
     return args, log
 
+
 def flatten_json(data_file, mode):
     """Flatten each article in training data."""
     with open(data_file) as f:
@@ -149,15 +154,20 @@ def flatten_json(data_file, mode):
         for paragraph in article['paragraphs']:
             context = paragraph['context']
             for qa in paragraph['qas']:
-                id_, question, answers = qa['id'], qa['question'], qa['answers']
-                if mode == 'train':
-                    answer = answers[0]['text']  # in training data there's only one answer
-                    answer_start = answers[0]['answer_start']
-                    answer_end = answer_start + len(answer)
-                    rows.append((id_, context, question, answer, answer_start, answer_end))
-                else:  # mode == 'dev'
-                    answers = [a['text'] for a in answers]
-                    rows.append((id_, context, question, answers))
+                if qa.get("is_impossible"):
+                    continue
+                try:
+                    id_, question, answers = qa['id'], qa['question'], qa.get('answers') or qa.get('plausible_answers')
+                    if mode == 'train':
+                        answer = answers[0]['text']  # in training data there's only one answer
+                        answer_start = answers[0]['answer_start']
+                        answer_end = answer_start + len(answer)
+                        rows.append((id_, context, question, answer, answer_start, answer_end))
+                    else:  # mode == 'dev'
+                        answers = [a['text'] for a in answers]
+                        rows.append((id_, context, question, answers))
+                except:
+                    continue
     return rows
 
 

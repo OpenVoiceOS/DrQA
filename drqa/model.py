@@ -3,16 +3,17 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
-import random
-import torch
-import torch.optim as optim
-import torch.nn.functional as F
-import numpy as np
 import logging
+import random
 
+import numpy as np
+import torch
+import torch.nn.functional as F
+import torch.optim as optim
 from torch.autograd import Variable
-from .utils import AverageMeter
-from .rnn_reader import RnnDocReader
+
+from drqa.rnn_reader import RnnDocReader
+from drqa.utils import AverageMeter
 
 # Modification:
 #   - change the logger name
@@ -25,7 +26,7 @@ from .rnn_reader import RnnDocReader
 logger = logging.getLogger(__name__)
 
 
-class DocReaderModel(object):
+class DocReaderModel:
     """High level model that handles intializing the underlying network
     architecture, saving, updating examples, and predicting examples.
     """
@@ -89,7 +90,7 @@ class DocReaderModel(object):
 
         # Clip gradients
         torch.nn.utils.clip_grad_norm_(self.network.parameters(),
-                                      self.opt['grad_clipping'])
+                                       self.opt['grad_clipping'])
 
         # Update parameters
         self.optimizer.step()

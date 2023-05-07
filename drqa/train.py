@@ -1,16 +1,19 @@
-import re
-import os
-import sys
-import math
-import random
-import string
-import logging
 import argparse
-from shutil import copyfile
-from datetime import datetime
+import logging
+import math
+import os
+import random
+import re
+import string
+import sys
 from collections import Counter
-import torch
+from datetime import datetime
+from shutil import copyfile
+
 import msgpack
+from os.path import dirname
+import torch
+
 from drqa.model import DocReaderModel
 from drqa.utils import str2bool
 
@@ -80,7 +83,7 @@ def main():
         log.warning("dev EM: {} F1: {}".format(em, f1))
         if args.save_dawn_logs:
             time_diff = datetime.now() - dawn_start
-            log.warning("dawn_entry: {}\t{}\t{}".format(epoch, f1/100.0, float(time_diff.total_seconds() / 3600.0)))
+            log.warning("dawn_entry: {}\t{}\t{}".format(epoch, f1 / 100.0, float(time_diff.total_seconds() / 3600.0)))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
             model_file = os.path.join(args.model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
@@ -210,7 +213,7 @@ def lr_decay(optimizer, lr_decay):
 
 
 def load_data(opt):
-    with open('SQuAD/meta.msgpack', 'rb') as f:
+    with open(f'{dirname(__file__)}/meta.msgpack', 'rb') as f:
         meta = msgpack.load(f, encoding='utf8')
     embedding = torch.Tensor(meta['embedding'])
     opt['pretrained_words'] = True
@@ -375,4 +378,3 @@ def score(pred, truth):
 
 if __name__ == '__main__':
     main()
-
