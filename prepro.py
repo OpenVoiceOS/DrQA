@@ -3,17 +3,14 @@ import collections
 import json
 import logging
 import multiprocessing
-import re
-import unicodedata
 from functools import partial
 from multiprocessing import Pool
 
 import msgpack
 import numpy as np
-import spacy
 from tqdm import tqdm
 
-from drqa.utils import str2bool
+from drqa.utils import str2bool, annotate, init, normalize_text, to_id
 
 
 def main():
@@ -171,55 +168,6 @@ def flatten_json(data_file, mode):
     return rows
 
 
-def clean_spaces(text):
-    """normalize spaces in a string."""
-    text = re.sub(r'\s', ' ', text)
-    return text
-
-
-def normalize_text(text):
-    return unicodedata.normalize('NFD', text)
-
-
-nlp = None
-
-
-def init():
-    """initialize spacy in each process"""
-    global nlp
-    nlp = spacy.load('en_core_web_md')
-
-
-def annotate(row, wv_cased):
-    global nlp
-    id_, context, question = row[:3]
-    q_doc = nlp(clean_spaces(question))
-    c_doc = nlp(clean_spaces(context))
-    question_tokens = [normalize_text(w.text) for w in q_doc]
-    context_tokens = [normalize_text(w.text) for w in c_doc]
-    question_tokens_lower = [w.lower() for w in question_tokens]
-    context_tokens_lower = [w.lower() for w in context_tokens]
-    context_token_span = [(w.idx, w.idx + len(w.text)) for w in c_doc]
-    context_tags = [w.tag_ for w in c_doc]
-    context_ents = [w.ent_type_ for w in c_doc]
-    question_lemma = {w.lemma_ if w.lemma_ != '-PRON-' else w.text.lower() for w in q_doc}
-    question_tokens_set = set(question_tokens)
-    question_tokens_lower_set = set(question_tokens_lower)
-    match_origin = [w in question_tokens_set for w in context_tokens]
-    match_lower = [w in question_tokens_lower_set for w in context_tokens_lower]
-    match_lemma = [(w.lemma_ if w.lemma_ != '-PRON-' else w.text.lower()) in question_lemma for w in c_doc]
-    # term frequency in document
-    counter_ = collections.Counter(context_tokens_lower)
-    total = len(context_tokens_lower)
-    context_tf = [counter_[w] / total for w in context_tokens_lower]
-    context_features = list(zip(match_origin, match_lower, match_lemma, context_tf))
-    if not wv_cased:
-        context_tokens = context_tokens_lower
-        question_tokens = question_tokens_lower
-    return (id_, context_tokens, context_features, context_tags, context_ents,
-            question_tokens, context, context_token_span) + row[3:]
-
-
 def index_answer(row):
     token_span = row[-4]
     starts, ends = zip(*token_span)
@@ -249,19 +197,6 @@ def build_vocab(questions, contexts, wv_vocab, sort_all=False):
     vocab.insert(0, "<PAD>")
     vocab.insert(1, "<UNK>")
     return vocab, counter
-
-
-def to_id(row, w2id, tag2id, ent2id, unk_id=1):
-    context_tokens = row[1]
-    context_features = row[2]
-    context_tags = row[3]
-    context_ents = row[4]
-    question_tokens = row[5]
-    question_ids = [w2id[w] if w in w2id else unk_id for w in question_tokens]
-    context_ids = [w2id[w] if w in w2id else unk_id for w in context_tokens]
-    tag_ids = [tag2id[w] for w in context_tags]
-    ent_ids = [ent2id[w] for w in context_ents]
-    return (row[0], context_ids, context_features, tag_ids, ent_ids, question_ids) + row[6:]
 
 
 if __name__ == '__main__':

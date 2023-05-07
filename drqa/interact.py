@@ -1,14 +1,13 @@
 import argparse
+import os
 import time
 
 import msgpack
 import torch
 
 from drqa.model import DocReaderModel
-from drqa.utils import str2bool
-from prepro import annotate, to_id, init
-from train import BatchGen
-import os
+from drqa.utils import str2bool, annotate, init, to_id, BatchGen
+
 """
 This script serves as a template to be modified to suit all possible testing environments, including and not limited 
 to files (json, xml, csv, ...), web service, databases and so on.
