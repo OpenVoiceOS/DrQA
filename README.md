@@ -17,7 +17,6 @@ The motivation for this project is to offer a clean version of DrQA for the mach
 
 ## Quick Start
 
-- download glove - http://nlp.stanford.edu/data/glove.840B.300d.zip
 - download SpaCy English language model `python3 -m spacy download en_core_web_md`
 - download model - https://huggingface.co/Jarbas/DrQA_en
 
@@ -50,6 +49,30 @@ The dog is a classic example of a domestic animal that likely travelled a commen
 
 ```
 The last example is a randomly picked product description from Amazon (not in SQuAD).
+
+
+### Python
+
+```python
+from drqa import DrQA
+
+parser = argparse.ArgumentParser(
+    description='Interact with document reader model.'
+)
+parser.add_argument('--model-file', help='path to model file')
+parser.add_argument('--meta-file',  help='path to meta.msgpack file')
+parser.add_argument("--cuda", type=str2bool, nargs='?',
+                    const=True, default=torch.cuda.is_available(),
+                    help='whether to use GPU acceleration.')
+args = parser.parse_args()
+
+dr = DrQA(args.model_file, args.meta_file, cuda=args.cuda)
+while True:
+    evidence = input("evidence:")
+    question = input("question:")
+    answer = dr.predict(evidence, question)
+    print(">", answer)
+```
 
 ### About
 
