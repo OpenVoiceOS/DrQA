@@ -15,7 +15,7 @@ import msgpack
 import torch
 
 from drqa.model import DocReaderModel
-from drqa.utils import str2bool, BatchGen
+from drqa.utils import BatchGen, str2bool
 
 
 def main():
@@ -30,7 +30,8 @@ def main():
 
     if args.resume:
         log.info('[loading previous model...]')
-        checkpoint = torch.load(os.path.join(args.model_dir, args.resume))
+        checkpoint = torch.load(os.path.join(args.model_dir, args.resume),
+                                weights_only=False)
         if args.resume_options:
             opt = checkpoint['config']
         state_dict = checkpoint['state_dict']
@@ -43,18 +44,18 @@ def main():
             torch.cuda.set_rng_state(checkpoint['torch_cuda_state'])
         if args.reduce_lr:
             lr_decay(model.optimizer, lr_decay=args.reduce_lr)
-            log.info('[learning rate reduced by {}]'.format(args.reduce_lr))
+            log.info(f'[learning rate reduced by {args.reduce_lr}]')
         batches = BatchGen(dev, batch_size=args.batch_size, evaluation=True, gpu=args.cuda)
         predictions = []
         for i, batch in enumerate(batches):
             predictions.extend(model.predict(batch))
-            log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
+            log.debug(f'> evaluating [{i}/{len(batches)}]')
         em, f1 = score(predictions, dev_y)
-        log.info("[dev EM: {} F1: {}]".format(em, f1))
+        log.info(f"[dev EM: {em} F1: {f1}]")
         if math.fabs(em - checkpoint['em']) > 1e-3 or math.fabs(f1 - checkpoint['f1']) > 1e-3:
             log.info('Inconsistent: recorded EM: {} F1: {}'.format(checkpoint['em'], checkpoint['f1']))
             log.error('Error loading model: current code is inconsistent with code used to train the previous model.')
-            exit(1)
+            sys.exit(1)
         best_val_score = checkpoint['best_eval']
     else:
         model = DocReaderModel(opt, embedding)
@@ -62,14 +63,14 @@ def main():
         best_val_score = 0.0
 
     for epoch in range(epoch_0, epoch_0 + args.epochs):
-        log.warning('Epoch {}'.format(epoch))
+        log.warning(f'Epoch {epoch}')
         # train
         batches = BatchGen(train, batch_size=args.batch_size, gpu=args.cuda)
         start = datetime.now()
         for i, batch in enumerate(batches):
             model.update(batch)
             if i % args.log_per_updates == 0:
-                log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
+                log.info('> epoch [{:2}] updates[{:6}] train loss[{:.5f}] remaining[{}]'.format(
                     epoch, model.updates, model.train_loss.value,
                     str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
         log.debug('\n')
@@ -78,15 +79,15 @@ def main():
         predictions = []
         for i, batch in enumerate(batches):
             predictions.extend(model.predict(batch))
-            log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
+            log.debug(f'> evaluating [{i}/{len(batches)}]')
         em, f1 = score(predictions, dev_y)
-        log.warning("dev EM: {} F1: {}".format(em, f1))
+        log.warning(f"dev EM: {em} F1: {f1}")
         if args.save_dawn_logs:
             time_diff = datetime.now() - dawn_start
-            log.warning("dawn_entry: {}\t{}\t{}".format(epoch, f1 / 100.0, float(time_diff.total_seconds() / 3600.0)))
+            log.warning(f"dawn_entry: {epoch}\t{f1 / 100.0}\t{float(time_diff.total_seconds() / 3600.0)}")
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
-            model_file = os.path.join(args.model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
+            model_file = os.path.join(args.model_dir, f'checkpoint_epoch_{epoch}.pt')
             model.save(model_file, epoch, [em, f1, best_val_score])
             if f1 > best_val_score:
                 best_val_score = f1
@@ -186,10 +187,10 @@ def setup():
         def emit(self, record):
             log_entry = self.format(record)
             if record.message.startswith('> '):
-                sys.stdout.write('{}\r'.format(log_entry.rstrip()))
+                sys.stdout.write(f'{log_entry.rstrip()}\r')
                 sys.stdout.flush()
             else:
-                sys.stdout.write('{}\n'.format(log_entry))
+                sys.stdout.write(f'{log_entry}\n')
 
     log = logging.getLogger(__name__)
     log.setLevel(logging.DEBUG)
@@ -214,7 +215,7 @@ def lr_decay(optimizer, lr_decay):
 
 def load_data(opt):
     with open(f'{dirname(__file__)}/meta.msgpack', 'rb') as f:
-        meta = msgpack.load(f, encoding='utf8')
+        meta = msgpack.unpack(f, raw=False)
     embedding = torch.Tensor(meta['embedding'])
     opt['pretrained_words'] = True
     opt['vocab_size'] = embedding.size(0)
@@ -224,7 +225,7 @@ def load_data(opt):
     BatchGen.pos_size = opt['pos_size']
     BatchGen.ner_size = opt['ner_size']
     with open(opt['data_file'], 'rb') as f:
-        data = msgpack.load(f, encoding='utf8')
+        data = msgpack.unpack(f, raw=False)
     train = data['train']
     data['dev'].sort(key=lambda x: len(x[1]))
     dev = [x[:-1] for x in data['dev']]

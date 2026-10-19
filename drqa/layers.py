@@ -4,13 +4,13 @@
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
+from torch import nn
 
-
-# No modification is made to this file.
+# Modified from the ParlAI DrQA reader for modern PyTorch (no autograd.Variable,
+# no tensor.data, packed-sequence API).
 # Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
+
 
 # ------------------------------------------------------------------------------
 # Modules
@@ -21,7 +21,7 @@ class StackedBRNN(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers,
                  dropout_rate=0, dropout_output=False, rnn_type=nn.LSTM,
                  concat_layers=False, padding=False):
-        super(StackedBRNN, self).__init__()
+        super().__init__()
         self.padding = padding
         self.dropout_output = dropout_output
         self.dropout_rate = dropout_rate
@@ -39,7 +39,7 @@ class StackedBRNN(nn.Module):
         Always handle padding in eval.
         """
         # No padding necessary.
-        if x_mask.data.sum() == 0:
+        if x_mask.sum() == 0:
             return self._forward_unpadded(x, x_mask)
         # Pad if we care or if its during eval.
         if self.padding or not self.training:
@@ -86,22 +86,22 @@ class StackedBRNN(nn.Module):
         """Slower (significantly), but more precise,
         encoding that handles padding."""
         # Compute sorted sequence lengths
-        lengths = x_mask.data.eq(0).long().sum(1).squeeze()
+        lengths = x_mask.eq(0).long().sum(1).squeeze()
         _, idx_sort = torch.sort(lengths, dim=0, descending=True)
         _, idx_unsort = torch.sort(idx_sort, dim=0)
 
-        lengths = list(lengths[idx_sort])
-        idx_sort = Variable(idx_sort)
-        idx_unsort = Variable(idx_unsort)
+        sorted_lengths = lengths[idx_sort].cpu().tolist()
 
         # Sort x
         x = x.index_select(0, idx_sort)
 
         # Transpose batch and sequence dims
         x = x.transpose(0, 1)
+        seq_len = x.size(0)
 
         # Pack it up
-        rnn_input = nn.utils.rnn.pack_padded_sequence(x, lengths)
+        rnn_input = nn.utils.rnn.pack_padded_sequence(
+            x, sorted_lengths, enforce_sorted=True)
 
         # Encode all layers
         outputs = [rnn_input]
@@ -113,13 +113,13 @@ class StackedBRNN(nn.Module):
                 dropout_input = F.dropout(rnn_input.data,
                                           p=self.dropout_rate,
                                           training=self.training)
-                rnn_input = nn.utils.rnn.PackedSequence(dropout_input,
-                                                        rnn_input.batch_sizes)
+                rnn_input = rnn_input._replace(data=dropout_input)
             outputs.append(self.rnns[i](rnn_input)[0])
 
         # Unpack everything
         for i, o in enumerate(outputs[1:], 1):
-            outputs[i] = nn.utils.rnn.pad_packed_sequence(o)[0]
+            outputs[i] = nn.utils.rnn.pad_packed_sequence(
+                o, total_length=seq_len)[0]
 
         # Concat hidden layers or take final
         if self.concat_layers:
@@ -135,8 +135,10 @@ class StackedBRNN(nn.Module):
         if output.size(1) != x_mask.size(1):
             padding = torch.zeros(output.size(0),
                                   x_mask.size(1) - output.size(1),
-                                  output.size(2)).type(output.data.type())
-            output = torch.cat([output, Variable(padding)], 1)
+                                  output.size(2),
+                                  dtype=output.dtype,
+                                  device=output.device)
+            output = torch.cat([output, padding], 1)
 
         # Dropout on output layer
         if self.dropout_output and self.dropout_rate > 0:
@@ -153,7 +155,7 @@ class SeqAttnMatch(nn.Module):
     """
 
     def __init__(self, input_size, identity=False):
-        super(SeqAttnMatch, self).__init__()
+        super().__init__()
         if not identity:
             self.linear = nn.Linear(input_size, input_size)
         else:
@@ -182,7 +184,7 @@ class SeqAttnMatch(nn.Module):
 
         # Mask padding
         y_mask = y_mask.unsqueeze(1).expand(scores.size())
-        scores.data.masked_fill_(y_mask.data, -float('inf'))
+        scores = scores.masked_fill(y_mask, -float('inf'))
 
         # Normalize with softmax
         alpha_flat = F.softmax(scores.view(-1, y.size(1)), dim=1)
@@ -201,7 +203,7 @@ class BilinearSeqAttn(nn.Module):
     """
 
     def __init__(self, x_size, y_size, identity=False):
-        super(BilinearSeqAttn, self).__init__()
+        super().__init__()
         if not identity:
             self.linear = nn.Linear(y_size, x_size)
         else:
@@ -215,7 +217,7 @@ class BilinearSeqAttn(nn.Module):
         """
         Wy = self.linear(y) if self.linear is not None else y
         xWy = x.bmm(Wy.unsqueeze(2)).squeeze(2)
-        xWy.data.masked_fill_(x_mask.data, -float('inf'))
+        xWy = xWy.masked_fill(x_mask, -float('inf'))
         if self.training:
             # In training we output log-softmax for NLL
             alpha = F.log_softmax(xWy, dim=1)
@@ -231,7 +233,7 @@ class LinearSeqAttn(nn.Module):
     """
 
     def __init__(self, input_size):
-        super(LinearSeqAttn, self).__init__()
+        super().__init__()
         self.linear = nn.Linear(input_size, 1)
 
     def forward(self, x, x_mask):
@@ -241,7 +243,7 @@ class LinearSeqAttn(nn.Module):
         """
         x_flat = x.contiguous().view(-1, x.size(-1))
         scores = self.linear(x_flat).view(x.size(0), x.size(1))
-        scores.data.masked_fill_(x_mask.data, -float('inf'))
+        scores = scores.masked_fill(x_mask, -float('inf'))
         alpha = F.softmax(scores, dim=1)
         return alpha
 
@@ -253,11 +255,9 @@ class LinearSeqAttn(nn.Module):
 
 def uniform_weights(x, x_mask):
     """Return uniform weights over non-masked input."""
-    alpha = Variable(torch.ones(x.size(0), x.size(1)))
-    if x.data.is_cuda:
-        alpha = alpha.cuda()
+    alpha = torch.ones(x.size(0), x.size(1), device=x_mask.device)
     alpha = alpha * x_mask.eq(0).float()
-    alpha = alpha / alpha.sum(1).expand(alpha.size())
+    alpha = alpha / alpha.sum(1).unsqueeze(1).expand(alpha.size())
     return alpha
 
 

@@ -65,15 +65,14 @@ def to_id(row, w2id, tag2id, ent2id, unk_id=1):
     context_tags = row[3]
     context_ents = row[4]
     question_tokens = row[5]
-    question_ids = [w2id[w] if w in w2id else unk_id for w in question_tokens]
-    context_ids = [w2id[w] if w in w2id else unk_id for w in context_tokens]
+    question_ids = [w2id.get(w, unk_id) for w in question_tokens]
+    context_ids = [w2id.get(w, unk_id) for w in context_tokens]
     tag_ids = [tag2id[w] for w in context_tags]
     ent_ids = [ent2id[w] for w in context_ents]
     return (row[0], context_ids, context_features, tag_ids, ent_ids, question_ids) + row[6:]
 
 
 def annotate(row, wv_cased):
-    global nlp
     id_, context, question = row[:3]
     q_doc = nlp(clean_spaces(question))
     c_doc = nlp(clean_spaces(context))

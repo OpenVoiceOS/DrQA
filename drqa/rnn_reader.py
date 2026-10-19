@@ -3,11 +3,12 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
+from typing import ClassVar
+
 import torch
-import torch.nn as nn
+from torch import nn
 
 from drqa import layers
-
 
 # Modification:
 #   - add 'pos' and 'ner' features.
@@ -17,10 +18,10 @@ from drqa import layers
 
 class RnnDocReader(nn.Module):
     """Network for the Document Reader module of DrQA."""
-    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN}
+    RNN_TYPES: ClassVar[dict] = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN}
 
     def __init__(self, opt, padding_idx=0, embedding=None):
-        super(RnnDocReader, self).__init__()
+        super().__init__()
         # Store config
         self.opt = opt
 
@@ -91,7 +92,7 @@ class RnnDocReader(nn.Module):
 
         # Question merging
         if opt['question_merge'] not in ['avg', 'self_attn']:
-            raise NotImplementedError('question_merge = %s' % opt['question_merge'])
+            raise NotImplementedError('question_merge = {}'.format(opt['question_merge']))
         if opt['question_merge'] == 'self_attn':
             self.self_attn = layers.LinearSeqAttn(question_hidden_size)
 
