@@ -1,5 +1,13 @@
 SQuAD/
-drqa/__pycache__/
 glove/
 models/
 *.log
+*.msgpack
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+build/
+dist/
+.venv/

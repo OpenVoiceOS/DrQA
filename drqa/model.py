@@ -9,8 +9,7 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch.optim as optim
-from torch.autograd import Variable
+from torch import optim
 
 from drqa.rnn_reader import RnnDocReader
 from drqa.utils import AverageMeter
@@ -64,7 +63,7 @@ class DocReaderModel:
             self.optimizer = optim.Adamax(parameters,
                                           weight_decay=self.opt['weight_decay'])
         else:
-            raise RuntimeError('Unsupported optimizer: %s' % self.opt['optimizer'])
+            raise RuntimeError('Unsupported optimizer: {}'.format(self.opt['optimizer']))
         if self.opt_state_dict:
             self.optimizer.load_state_dict(self.opt_state_dict)
 
@@ -85,7 +84,7 @@ class DocReaderModel:
         self.train_loss.update(loss.item())
 
         # Clear gradients and run backward
-        self.optimizer.zero_grad()
+        self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
 
         # Clip gradients
@@ -101,18 +100,15 @@ class DocReaderModel:
         self.network.eval()
 
         # Transfer to GPU
-        if self.opt['cuda']:
-            inputs = [Variable(e.cuda()) for e in ex[:7]]
-        else:
-            inputs = [Variable(e) for e in ex[:7]]
+        inputs = [e.to(self.device) for e in ex[:7]]
 
         # Run forward
         with torch.no_grad():
             score_s, score_e = self.network(*inputs)
 
         # Transfer to CPU/normal tensors for numpy ops
-        score_s = score_s.data.cpu()
-        score_e = score_e.data.cpu()
+        score_s = score_s.detach().cpu()
+        score_e = score_e.detach().cpu()
 
         # Get argmax text spans
         text = ex[-2]
@@ -120,7 +116,7 @@ class DocReaderModel:
         predictions = []
         max_len = self.opt['max_len'] or score_s.size(1)
         for i in range(score_s.size(0)):
-            scores = torch.ger(score_s[i], score_e[i])
+            scores = torch.outer(score_s[i], score_e[i])
             scores.triu_().tril_(max_len - 1)
             scores = scores.numpy()
             s_idx, e_idx = np.unravel_index(np.argmax(scores), scores.shape)
@@ -146,9 +142,10 @@ class DocReaderModel:
             'random_state': random.getstate(),
             'torch_state': torch.random.get_rng_state(),
             'torch_cuda_state': torch.cuda.get_rng_state()
+            if torch.cuda.is_available() else None
         }
         try:
             torch.save(params, filename)
-            logger.info('model saved to {}'.format(filename))
-        except BaseException:
+            logger.info(f'model saved to {filename}')
+        except Exception:  # noqa: BLE001 - checkpoint saving must never abort training
             logger.warning('[ WARN: Saving failed... continuing anyway. ]')

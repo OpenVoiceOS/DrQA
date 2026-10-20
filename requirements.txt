@@ -1,3 +1,0 @@
-numpy
-msgpack-python
-spacy>=3

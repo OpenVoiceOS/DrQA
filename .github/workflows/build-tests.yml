@@ -1,0 +1,17 @@
+name: Build Tests
+
+on:
+  pull_request:
+    branches: [dev, master, main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/build-tests.yml@dev
+    secrets: inherit
+    with:
+      # Torch does not ship wheels for the newest CPython releases yet, so the
+      # matrix stops at 3.12 rather than the fleet-wide 3.14 ceiling.
+      python_versions: '["3.10", "3.11", "3.12"]'
+      install_extras: 'test'
+      test_path: 'test'
