@@ -10,7 +10,7 @@ import msgpack
 import numpy as np
 from tqdm import tqdm
 
-from drqa.utils import str2bool, annotate, init, normalize_text, to_id
+from drqa.utils import annotate, init, normalize_text, str2bool, to_id
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
     train = list(map(index_answer, train))
     initial_len = len(train)
     train = list(filter(lambda x: x[-1] is not None, train))
-    log.info('drop {} inconsistent samples.'.format(initial_len - len(train)))
+    log.info(f'drop {initial_len - len(train)} inconsistent samples.')
     log.info('tokens generated')
 
     # load vocabulary from word vector files
@@ -44,8 +44,7 @@ def main():
     vocab, counter = build_vocab([row[5] for row in full], [row[1] for row in full], wv_vocab, args.sort_all)
     total = sum(counter.values())
     matched = sum(counter[t] for t in vocab)
-    log.info('vocab coverage {1}/{0} | OOV occurrence {2}/{3} ({4:.4f}%)'.format(
-        len(counter), len(vocab), (total - matched), total, (total - matched) / total * 100))
+    log.info(f'vocab coverage {len(vocab)}/{len(counter)} | OOV occurrence {total - matched}/{total} ({(total - matched) / total * 100:.4f}%)')
     counter_tag = collections.Counter(w for row in full for w in row[3])
     vocab_tag = sorted(counter_tag, key=counter_tag.get, reverse=True)
     counter_ent = collections.Counter(w for row in full for w in row[4])
@@ -53,9 +52,9 @@ def main():
     w2id = {w: i for i, w in enumerate(vocab)}
     tag2id = {w: i for i, w in enumerate(vocab_tag)}
     ent2id = {w: i for i, w in enumerate(vocab_ent)}
-    log.info('Vocabulary size: {}'.format(len(vocab)))
-    log.info('Found {} POS tags.'.format(len(vocab_tag)))
-    log.info('Found {} entity tags: {}'.format(len(vocab_ent), vocab_ent))
+    log.info(f'Vocabulary size: {len(vocab)}')
+    log.info(f'Found {len(vocab_tag)} POS tags.')
+    log.info(f'Found {len(vocab_ent)} entity tags: {vocab_ent}')
 
     to_id_ = partial(to_id, w2id=w2id, tag2id=tag2id, ent2id=ent2id)
     train = list(map(to_id_, train))
@@ -163,7 +162,7 @@ def flatten_json(data_file, mode):
                     else:  # mode == 'dev'
                         answers = [a['text'] for a in answers]
                         rows.append((id_, context, question, answers))
-                except:
+                except (KeyError, IndexError, TypeError):
                     continue
     return rows
 

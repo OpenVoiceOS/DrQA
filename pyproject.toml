@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ovos-drqa-plugin"
+dynamic = ["version"]
+description = "DrQA document reader (Reading Wikipedia to Answer Open-Domain Questions) as an OVOS extractive QA engine"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [
+    { name = "jarbasAi", email = "jarbasai@mailfence.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.0.0",
+    "numpy",
+    "msgpack>=1.0.0",
+    # The spaCy 4.0.0 dev releases require thinc 9.0, whose compiled modules
+    # target numpy 1 and fail to import under numpy 2 ("numpy.dtype size
+    # changed"); they also pull blis 0.7, which has no wheel for Python 3.14
+    # and does not build there. A prerelease-allowing resolver selects them
+    # over 3.8.x, so they are excluded by name. 3.8.10 is the first 3.8
+    # release with Python 3.14 wheels.
+    "spacy>=3.8.10,!=4.0.0.dev1,!=4.0.0.dev2,!=4.0.0.dev3",
+    "tqdm",
+    "huggingface_hub",
+    "ovos-plugin-manager>=2.1.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/OpenVoiceOS/DrQA"
+Source = "https://github.com/OpenVoiceOS/DrQA"
+
+[project.scripts]
+drqa-interact = "drqa.interact:main"
+
+[project.entry-points."opm.agents.extractive_qa"]
+ovos-drqa-plugin = "drqa.opm:DrQAExtractiveQAEngine"
+
+[tool.setuptools.dynamic]
+version = { attr = "drqa.version.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["drqa*"]
+
+[tool.pytest.ini_options]
+markers = ["network: downloads the model from HuggingFace and runs inference"]
+addopts = "-m 'not network'"
+testpaths = ["test"]

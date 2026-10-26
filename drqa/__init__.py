@@ -2,20 +2,25 @@ import msgpack
 import torch
 
 from drqa.model import DocReaderModel
-from drqa.utils import annotate, init, to_id, BatchGen
+from drqa.utils import BatchGen, annotate, init, to_id
 
 
 class DrQA:
-    def __init__(self, model_path, meta_path, cuda=torch.cuda.is_available()):
+    def __init__(self, model_path, meta_path, cuda=None):
+        if cuda is None:
+            cuda = torch.cuda.is_available()
+        # PyTorch >=2.6 defaults weights_only=True; these checkpoints also carry
+        # the training config and optimizer state, so opt back into full loading.
         if cuda:
-            checkpoint = torch.load(model_path)
+            checkpoint = torch.load(model_path, weights_only=False)
         else:
-            checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
+            checkpoint = torch.load(model_path, weights_only=False,
+                                    map_location=lambda storage, loc: storage)
         self.cuda = cuda
         state_dict = checkpoint['state_dict']
         opt = checkpoint['config']
         with open(meta_path, 'rb') as f:
-            self.meta = msgpack.load(f, encoding='utf8')
+            self.meta = msgpack.unpack(f, raw=False)
 
         embedding = torch.Tensor(self.meta['embedding'])
         opt['pretrained_words'] = True

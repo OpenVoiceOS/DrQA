@@ -5,21 +5,21 @@ Dawnbench instructions
 
 2) Configure Drive for 100GB of space + SSD
 
-2) Install pytorch 0.4.1 w/ CUDA:
+2) Install PyTorch (CUDA build):
 
 ```
-conda install pytorch torchvision cuda92 -c pytorch
+pip install torch
 ```
 
 Clone git repo:
 
-    git clone https://github.com/hitvoice/DrQA.git
+    git clone https://github.com/OpenVoiceOS/DrQA.git
 
 Follow readme:
 
     cd DrQA
 
-    pip install -r requirements.txt
+    pip install -e .
 
     bash download.sh
 
